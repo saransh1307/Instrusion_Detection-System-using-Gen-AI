@@ -1,66 +1,78 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import numpy as np
 import pandas as pd
+import torch
+from sdv.single_table import CTGAN
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from Intrusion_Detection_system.Models.ctgan import CTGAN
-import os
 
-# Load and preprocess data
-def load_data(file_path):
-    df = pd.read_csv(file_path)
-    # Encode categorical variables
-    categorical_cols = df.select_dtypes(include=['object']).columns
-    encoders = {}
-    for col in categorical_cols:
-        le = LabelEncoder()
-        df[col] = le.fit_transform(df[col])
-        encoders[col] = le
-    # Scale numerical variables
-    scaler = MinMaxScaler()
-    df[df.columns] = scaler.fit_transform(df[df.columns])
-    return df, encoders, scaler
+class CTGANSynthesizer:
+    def __init__(self, epochs=300):
+        self.epochs = epochs
+        self.ctgan = None
 
-# Train CTGAN
-def train_ctgan(df, epochs=300):
-    ctgan = CTGAN(epochs=epochs)
-    ctgan.fit(df)
-    return ctgan
+    def train(self, data: pd.DataFrame):
+        # Trains the CTGAN model on the provided real data. pr.DataFrame is the real data.
 
-# Generate synthetic data
-def generate_synthetic_data(ctgan, num_samples):
-    synthetic_data = ctgan.sample(num_samples)
-    return synthetic_data
+        print(f"Training CTGAN for {self.epochs} epochs...")
+        self.ctgan = CTGAN(epochs=self.epochs, verbose=False) # verbose=False to reduce output. Instantiates the CTGAN model from the sdv library.
+        self.ctgan.fit(data) # this is the core training step where the generator and discriminator plays the game of mouse and rat. you know what im talking about.
+        print("CTGAN training complete.") # now the generator should generate synthetic data that would be so real.
 
-# Evaluate synthetic data
-def evaluate_synthetic_data(real_data, synthetic_data):
-    # Placeholder for evaluation logic
-    # You can implement statistical tests or train a classifier to distinguish between real and synthetic data
-    pass
+    def generate_synthetic_data(self, num_samples: int) -> pd.DataFrame:
+        
+        # Generates a specified number of synthetic samples using the trained CTGAN. the num_samples is the number of samples to generate.
+        # -> pd.DataFrame: Indicates that the method will return a pandas DataFrame
+        
+        if self.ctgan is None:
+            raise ValueError("CTGAN model not trained. Call train() first.")
+        print(f"Generating {num_samples} synthetic samples...")
+        synthetic_data = self.ctgan.sample(num_samples) # this is where the magic happens. the trained CTGAN model generates synthetic data based on the learned distribution of the real data.
+        print("Synthetic data generation complete.")
+        return synthetic_data
+    
+    # Till here the synthethic data generation is done. Now we can evaluate the synthetic data. for the 
 
-def main():
-    # Paths to your data files
-    train_file = 'path_to_train_data.csv'
-    test_file = 'path_to_test_data.csv'
-
-    # Load and preprocess data
-    train_df, encoders, scaler = load_data(train_file)
-    test_df, _, _ = load_data(test_file)
-
-    # Train CTGAN
-    ctgan = train_ctgan(train_df)
-
-    # Generate synthetic data
-    synthetic_data = generate_synthetic_data(ctgan, num_samples=1000)
-
-    # Evaluate synthetic data
-    evaluate_synthetic_data(train_df, synthetic_data)
-
-    # Save synthetic data
-    synthetic_data.to_csv('synthetic_data.csv', index=False)
+    def evaluate_synthetic_data(self, real_data: pd.DataFrame, synthetic_data: pd.DataFrame):
+        """
+        Placeholder for synthetic data evaluation.
+        You can integrate advanced evaluation metrics here (e.g., DCR, visualization).
+        """
+        print("\n--- Evaluating Synthetic Data (Placeholder) ---")
+        # Example: Basic comparison of statistical properties
+        print("Real data shape:", real_data.shape)
+        print("Synthetic data shape:", synthetic_data.shape)
+        print("\nStatistical comparison (mean of first few columns):")
+        print("Real Data Mean:\n", real_data.iloc[:, :5].mean())
+        print("Synthetic Data Mean:\n", synthetic_data.iloc[:, :5].mean())
+        print("Further evaluation metrics (e.g., DCR, visualizations) can be added here.")
 
 if __name__ == '__main__':
-    main()
+    # This block is for testing the CTGANSynthesizer in isolation
+    from src.utils import load_and_preprocess_ctgan_data
+
+    print("Running CTGAN_model.py in standalone test mode.")
+    # Create a dummy CSV for testing
+    dummy_data = {
+        'col1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        'col2': ['A', 'B', 'A', 'C', 'B', 'A', 'C', 'B', 'A', 'C'],
+        'col3': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    }
+    dummy_df = pd.DataFrame(dummy_data)
+    dummy_df.to_csv('dummy_data_ctgan.csv', index=False)
+
+    # Load and preprocess dummy data
+    train_df, _, _ = load_and_preprocess_ctgan_data('dummy_data_ctgan.csv')
+
+    # Initialize and train CTGAN
+    ctgan_synth = CTGANSynthesizer(epochs=10) # Reduced epochs for quick test
+    ctgan_synth.train(train_df)
+
+    # Generate synthetic data
+    synthetic_df = ctgan_synth.generate_synthetic_data(num_samples=5)
+    print("\nGenerated Synthetic Data Head:\n", synthetic_df.head())
+
+    # Evaluate synthetic data
+    ctgan_synth.evaluate_synthetic_data(train_df, synthetic_df)
+
+    # Clean up dummy file
+    import os
+    os.remove('dummy_data_ctgan.csv')
+    print("\nCTGAN standalone test complete.")
