@@ -9,7 +9,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from src.utils import load_and_preprocess_nslkdd_data, vae_loss_function, NSL_KDD_TRAIN_PATH, NSL_KDD_TEST_PATH
 
 # Constants specific to VAE/DBN model
-MODEL_PATH = "models/vae_model_with_dbn.pth"
+MODEL_PATH = "models/vae_model_with_dbn.pth"  #once running for the first time, this model will be saved in the models directory. on the second run, this model will be loaded and IDS will be run.
+DBN_MODEL_PATH = "Intrusion_Detection_system/models/dbn_weights.pth"
+THRESHOLD_PATH = "Intrusion_Detection_system/models/anomaly_threshold.npy"
 
 # ------------------------------ DBN ------------------------------
 class RBM(nn.Module):
@@ -122,6 +124,11 @@ def train_vae_dbn(train_data_path, epochs_dbn=10, epochs_vae=50, lr_dbn=0.01, lr
     dbn = DBN(dbn_layers)
     dbn.pretrain(X_train_tensor, epochs=epochs_dbn, lr=lr_dbn)
 
+
+    dbn.pretrain(X_train_tensor, epochs=epochs_dbn, lr=lr_dbn)
+    torch.save(dbn.state_dict(), DBN_MODEL_PATH)
+    print(f"✅ DBN weights saved at {DBN_MODEL_PATH}")
+
     # Extract features using trained DBN
     dbn_features = dbn(X_train_tensor).detach()
     print(f"DBN extracted features shape: {dbn_features.shape}")
@@ -154,7 +161,10 @@ def train_vae_dbn(train_data_path, epochs_dbn=10, epochs_vae=50, lr_dbn=0.01, lr
         # Set threshold based on a percentile of training errors (e.g., 95th percentile)
         threshold = np.percentile(errors, 95)
     print(f"Anomaly threshold determined from training data: {threshold:.4f}")
-    return vae_model, encoders, scaler, dbn, threshold
+    np.save(THRESHOLD_PATH, threshold)
+    print(f"✅ Anomaly threshold saved at {THRESHOLD_PATH}")
+
+    return vae_model, encoders, scaler, dbn, threshold, 
 
 def detect_anomalies(model, dbn_model, data_path, encoders, scaler, threshold):
     """
@@ -213,42 +223,45 @@ def evaluate_detection(true_labels, predicted_labels):
     print(f"  F1 Score:  {f1:.4f}")
     return acc, prec, rec, f1
 
-if __name__ == '__main__':
-    # This block is for testing the VAE_DBN components in isolation
-    print("Running VAE_DBN_model.py in standalone test mode.")
 
-    # Ensure dummy data is available for testing or modify to use actual paths
-    # For a quick test, we'll try to use the NSL-KDD paths if they exist
-    if not os.path.exists(NSL_KDD_TRAIN_PATH):
-        print(f"Warning: Training data not found at {NSL_KDD_TRAIN_PATH}. Cannot run standalone test.")
-        print("Please ensure NSL-KDD datasets are placed in the 'data' directory or update paths.")
-    else:
-        # Train the model
-        print("\n--- Standalone Training Test ---")
-        trained_vae_model, encoders, scaler, dbn_trained, threshold = train_vae_dbn(NSL_KDD_TRAIN_PATH, epochs_dbn=2, epochs_vae=5) # Reduced epochs for testing
+# below is the standalone test block which can be used to test the VAE_DBN components in isolation.
 
-        # Load the model and perform detection
-        print("\n--- Standalone Detection Test ---")
-        if os.path.exists(MODEL_PATH):
-            X_test, y_test, original_df, _, _ = load_and_preprocess_nslkdd_data(NSL_KDD_TEST_PATH, encoders, scaler)
-            X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+# if __name__ == '__main__':
+#     # This block is for testing the VAE_DBN components in isolation
+#     print("Running VAE_DBN_model.py in standalone test mode.")
 
-            loaded_vae_model = VAE(X_test_tensor.shape[1] if dbn_trained is None else dbn_trained(X_test_tensor).shape[1])
-            loaded_vae_model.load_state_dict(torch.load(MODEL_PATH))
-            loaded_vae_model.eval()
+#     # Ensure dummy data is available for testing or modify to use actual paths
+#     # For a quick test, we'll try to use the NSL-KDD paths if they exist
+#     if not os.path.exists(NSL_KDD_TRAIN_PATH):
+#         print(f"Warning: Training data not found at {NSL_KDD_TRAIN_PATH}. Cannot run standalone test.")
+#         print("Please ensure NSL-KDD datasets are placed in the 'data' directory or update paths.")
+#     else:
+#         # Train the model
+#         print("\n--- Standalone Training Test ---")
+#         trained_vae_model, encoders, scaler, dbn_trained, threshold = train_vae_dbn(NSL_KDD_TRAIN_PATH, epochs_dbn=2, epochs_vae=5) # Reduced epochs for testing
 
-            # For standalone test, we need to re-initialize DBN if not loaded from saved state
-            # In actual integration, the DBN object will be passed from training
-            # For this standalone test, we re-create a DBN with the same layer structure
-            dbn_test_instance = DBN([X_test.shape[1], 64, 32])
-            # Note: For a robust standalone test, DBN weights should also be saved/loaded
-            # For simplicity here, we assume it's feature extraction which is stateless after pretraining
-            # or pretrain it again on test data (not ideal, but works for isolated testing of VAE/DBN flow)
-            dbn_test_instance.pretrain(X_test_tensor, epochs=1, lr=0.01) # Minimal pre-training for test
+#         # Load the model and perform detection
+#         print("\n--- Standalone Detection Test ---")
+#         if os.path.exists(MODEL_PATH):
+#             X_test, y_test, original_df, _, _ = load_and_preprocess_nslkdd_data(NSL_KDD_TEST_PATH, encoders, scaler)
+#             X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
 
-            results, predicted, true_labels = detect_anomalies(loaded_vae_model, dbn_test_instance, NSL_KDD_TEST_PATH, encoders, scaler, threshold)
-            for r in results[:3]:
-                print(r)
-            evaluate_detection(true_labels, predicted)
-        else:
-            print("Model not saved, cannot perform standalone detection test.")
+#             loaded_vae_model = VAE(X_test_tensor.shape[1] if dbn_trained is None else dbn_trained(X_test_tensor).shape[1])
+#             loaded_vae_model.load_state_dict(torch.load(MODEL_PATH))
+#             loaded_vae_model.eval()
+
+#             # For standalone test, we need to re-initialize DBN if not loaded from saved state
+#             # In actual integration, the DBN object will be passed from training
+#             # For this standalone test, we re-create a DBN with the same layer structure
+#             dbn_test_instance = DBN([X_test.shape[1], 64, 32])
+#             # Note: For a robust standalone test, DBN weights should also be saved/loaded
+#             # For simplicity here, we assume it's feature extraction which is stateless after pretraining
+#             # or pretrain it again on test data (not ideal, but works for isolated testing of VAE/DBN flow)
+#             dbn_test_instance.pretrain(X_test_tensor, epochs=1, lr=0.01) # Minimal pre-training for test
+
+#             results, predicted, true_labels = detect_anomalies(loaded_vae_model, dbn_test_instance, NSL_KDD_TEST_PATH, encoders, scaler, threshold)
+#             for r in results[:3]:
+#                 print(r)
+#             evaluate_detection(true_labels, predicted)
+#         else:
+#             print("Model not saved, cannot perform standalone detection test.")
