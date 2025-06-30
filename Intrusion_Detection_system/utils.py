@@ -1,13 +1,13 @@
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from scipy.io import arff
 import tempfile
+import numpy as np
 import torch
 
 # Constants - it's good practice to define these globally or pass them
 # If you have fixed paths for datasets, define them here or in a config file
-NSL_KDD_TRAIN_PATH = r"D:\Saransh\Coding\DATASETS\KDDTrain+_20Percent.arff"
-NSL_KDD_TEST_PATH = r"D:\Saransh\Coding\DATASETS\KDDTest+.arff"
+NSL_KDD_TRAIN_PATH = "DATA/RAW/KDDTrain+_20Percent.txt"
+NSL_KDD_TEST_PATH = "DATA/RAW/KDDTest+.txt"
 
 FEATURE_NAMES = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes',
@@ -41,35 +41,7 @@ def load_and_preprocess_ctgan_data(file_path):
     return df, encoders, scaler
 
 def load_and_preprocess_nslkdd_data(filepath, encoders=None, scaler=None):
-    """
-    Loads and preprocesses NSL-KDD .arff data for VAE/DBN.
-    Handles ARFF file quirks, categorical encoding, and numerical scaling.
-    """
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
-
-    # Clean ARFF file for proper parsing by scipy.io.arff
-    cleaned_lines = []
-    for line in lines:
-        if line.strip().lower().startswith("@attribute") and '{' in line and '}' in line:
-            attr, values = line.split('{', 1)
-            values = values.split('}')[0]
-            cleaned_values = ','.join([v.strip().replace("'", "") for v in values.split(',')])
-            new_line = f"{attr.strip()} {{{cleaned_values}}}\n"
-            cleaned_lines.append(new_line)
-        else:
-            cleaned_lines.append(line)
-
-    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.arff') as temp_file:
-        temp_file.writelines(cleaned_lines)
-        temp_filepath = temp_file.name
-
-    data, meta = arff.loadarff(temp_filepath)
-    df = pd.DataFrame(data)
-
-    # Decode byte strings and clean string values
-    for col in df.select_dtypes([object]).columns:
-        df[col] = df[col].map(lambda x: x.decode('utf-8').strip().replace("'", "") if isinstance(x, bytes) else x.strip().replace("'", ""))
+    df = pd.read_csv(filepath, names=FEATURE_NAMES)
 
     # Rename 'class' column to 'attack_type' for clarity
     if 'class' in df.columns:
@@ -85,24 +57,31 @@ def load_and_preprocess_nslkdd_data(filepath, encoders=None, scaler=None):
     X = df.drop(columns=['attack_type'])
     y = df['attack_type']
 
+    # Encode categorical features
     categorical_cols = ['protocol_type', 'service', 'flag']
-    if encoders is None: # Fit encoders if not provided (for training data)
+    if encoders is None:
         encoders = {}
         for col in categorical_cols:
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col])
             encoders[col] = le
-    else: # Use existing encoders for consistency (for test data)
+    else:
         for col in categorical_cols:
-            # Handle potential unseen labels in test data if they exist
-            # For simplicity, we assume all labels are seen in train, or use handle_unknown='ignore'
+            # Handle unseen labels by mapping them to 'unknown'
+            known_classes = set(encoders[col].classes_)
+            X[col] = X[col].apply(lambda val: val if val in known_classes else 'unknown')
+
+            # If 'unknown' is not already in the encoder classes, add it
+            if 'unknown' not in encoders[col].classes_:
+                encoders[col].classes_ = np.append(encoders[col].classes_, 'unknown')
+
             X[col] = encoders[col].transform(X[col])
 
     # Scale numerical features
-    if scaler is None: # Fit scaler if not provided (for training data)
+    if scaler is None:
         scaler = MinMaxScaler()
         X_scaled = scaler.fit_transform(X)
-    else: # Use existing scaler for consistency (for test data)
+    else:
         X_scaled = scaler.transform(X)
 
     # Convert attack_type to binary (0 for normal, 1 for malicious)

@@ -2,12 +2,12 @@ import os
 import torch
 import pandas as pd
 import numpy as np
-from Intrusion_Detection_system.Models.Synthethic_Data_generation import CTGANSynthesizer  # Importing CTGANSynthesizer for synthetic data generation
-from Intrusion_Detection_system.Models.VAE_DBN_model import (
+from Models.Synthethic_Data_generation import MyCTGANSynthesizer  # Importing MyCTGANSynthesizer for synthetic data generation
+from Models.VAE_DBN import (
     DBN, VAE, train_vae_dbn, detect_anomalies, evaluate_detection,
     MODEL_PATH
 )
-from Intrusion_Detection_system.utils import (
+from utils import (
     load_and_preprocess_ctgan_data,
     load_and_preprocess_nslkdd_data,
     NSL_KDD_TRAIN_PATH,
@@ -15,12 +15,12 @@ from Intrusion_Detection_system.utils import (
 )
 
 # -------------------- PATH CONFIGURATION --------------------
-CTGAN_TRAIN_DATA_PATH = "Intrusion_Detection_system/DATA/RAW/KDDTrain+.txt"
-SYNTHETIC_DATA_OUTPUT_PATH = "Intrusion_Detection_system/DATA/Synthetic/synthetic_data.csv"
-MODEL_PATH = "Intrusion_Detection_system/models/vae_model_with_dbn.pth"
+CTGAN_TRAIN_DATA_PATH = "DATA/RAW/KDDTrain+_20Percent.txt"
+SYNTHETIC_DATA_OUTPUT_PATH = "DATA/Synthetic/synthetic_data.csv"
+MODEL_PATH = "/models/vae_model_with_dbn.pth"
 # THRESHOLD_PATH = "Intrusion_Detection_system/models/anomaly_threshold.txt"
-DBN_MODEL_PATH = "Intrusion_Detection_system/models/dbn_weights.pth"
-THRESHOLD_PATH = "Intrusion_Detection_system/models/anomaly_threshold.npy"
+DBN_MODEL_PATH = "/models/dbn_weights.pth"
+THRESHOLD_PATH = "/models/anomaly_threshold.npy"
 
 
 
@@ -28,7 +28,7 @@ def main():
     print("\n🚀 Starting Intrusion Detection System Workflow...")
 
     # Ensure required directories exist
-    os.makedirs("Intrusion_Detection_system/DATA/Synthetic/synthetic_data.csv", exist_ok=True)
+    os.makedirs(os.path.dirname(SYNTHETIC_DATA_OUTPUT_PATH), exist_ok=True)
     os.makedirs("Intrusion_Detection_system/models", exist_ok=True)
 
     # -------------------- PHASE 1: CTGAN --------------------
@@ -38,7 +38,7 @@ def main():
     df_for_ctgan_training, _, _ = load_and_preprocess_ctgan_data(CTGAN_TRAIN_DATA_PATH)  # we are using NSLKDD dataset for training the CTGAN model. The CTGAN model is trained on the NSL-KDD dataset to generate synthetic data that resembles the original data distribution.
 
     # Train CTGAN
-    ctgan_synthesizer = CTGANSynthesizer(epochs=50)   # ctgan_synthesizer came from the Synthethic_Data_generation.py file. The CTGANSynthesizer class is used to train a CTGAN model on the NSL-KDD dataset.
+    ctgan_synthesizer = MyCTGANSynthesizer(epochs=20)   # ctgan_synthesizer came from the Synthethic_Data_generation.py file. The CTGANSynthesizer class is used to train a CTGAN model on the NSL-KDD dataset.
     ctgan_synthesizer.train(df_for_ctgan_training) 
 
     # Generate synthetic samples

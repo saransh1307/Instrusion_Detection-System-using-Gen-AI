@@ -6,7 +6,7 @@ import numpy as np
 import os
 from datetime import datetime
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from src.utils import load_and_preprocess_nslkdd_data, vae_loss_function, NSL_KDD_TRAIN_PATH, NSL_KDD_TEST_PATH
+from utils import load_and_preprocess_nslkdd_data, vae_loss_function, NSL_KDD_TRAIN_PATH, NSL_KDD_TEST_PATH
 
 # Constants specific to VAE/DBN model
 MODEL_PATH = "models/vae_model_with_dbn.pth"  #once running for the first time, this model will be saved in the models directory. on the second run, this model will be loaded and IDS will be run.
@@ -204,6 +204,7 @@ def detect_anomalies(model, dbn_model, data_path, encoders, scaler, threshold):
             formatted = "\n".join([f"  {key}: {value}" for key, value in result.items()])
             results.append(formatted + "\n")
     print(f"Detected {len(results)} anomalies.")
+    predicted = anomalies.astype(int)  # Convert boolean array to int (0 for normal, 1 for anomaly)
     return results, predicted, y_test.to_numpy()
 
 

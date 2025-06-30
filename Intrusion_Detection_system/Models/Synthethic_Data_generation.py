@@ -1,9 +1,11 @@
 import pandas as pd
 import torch
-from sdv.single_table import CTGAN    # sdc is synthetic data vault used to generate synthetic data. CTGAN is a type of GAN (Generative Adversarial Network) specifically designed for tabular data.
+from sdv.single_table import CTGANSynthesizer
+    # sdc is synthetic data vault used to generate synthetic data. CTGAN is a type of GAN (Generative Adversarial Network) specifically designed for tabular data.
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+from sdv.metadata import SingleTableMetadata 
 
-class CTGANSynthesizer:
+class   MyCTGANSynthesizer:
     def __init__(self, epochs=300):   # the default epoch is set to 300. while the calling of this constructor if the user gives some other value so that value will be overriden by the default value of 300.
         self.epochs = epochs
         self.ctgan = None
@@ -12,7 +14,10 @@ class CTGANSynthesizer:
         # Trains the CTGAN model on the provided real data. pd.DataFrame is the real data.
 
         print(f"Training CTGAN for {self.epochs} epochs...")
-        self.ctgan = CTGAN(epochs=self.epochs, verbose=False) # verbose=False to reduce output. Instantiates the CTGAN model from the sdv library.
+        metadata = SingleTableMetadata()
+        metadata.detect_from_dataframe(data=data)
+
+        self.ctgan = CTGANSynthesizer(metadata=metadata, epochs=self.epochs)# verbose=False to reduce output. Instantiates the CTGAN model from the sdv library.
         self.ctgan.fit(data) # this is the core training step where the generator and discriminator plays the game of mouse and rat. you know what im talking about.
         print("CTGAN training complete.") # now the generator should generate synthetic data that would be so real.
 
