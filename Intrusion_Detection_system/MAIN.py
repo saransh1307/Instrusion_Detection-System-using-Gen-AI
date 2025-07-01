@@ -17,6 +17,7 @@ from utils import (
 # -------------------- PATH CONFIGURATION --------------------
 CTGAN_TRAIN_DATA_PATH = "DATA/RAW/KDDTrain+_20Percent.txt"
 SYNTHETIC_DATA_OUTPUT_PATH = "DATA/Synthetic/synthetic_data.csv"
+AUGMENTED_DATA_OUTPUT_PATH = "DATA/Augmented(Gen+Raw)/augmented_data.csv"
 MODEL_PATH = "/models/vae_model_with_dbn.pth"
 # THRESHOLD_PATH = "Intrusion_Detection_system/models/anomaly_threshold.txt"
 DBN_MODEL_PATH = "/models/dbn_weights.pth"
@@ -46,6 +47,11 @@ def main():
     synthetic_df.to_csv(SYNTHETIC_DATA_OUTPUT_PATH, index=False) # Save synthetic data to CSV because Pandas DataFrame is used to store the synthetic data.
     print(f"✅ Saved synthetic data to: {SYNTHETIC_DATA_OUTPUT_PATH}")  # The synthetic data is saved to the specified path.
 
+    print("🔄 Augmenting training data with synthetic samples...")
+    original_df = pd.read_csv(NSL_KDD_TRAIN_PATH)
+    augmented_df = pd.concat([original_df, synthetic_df], ignore_index=True)
+    augmented_df.to_csv(AUGMENTED_DATA_OUTPUT_PATH, index=False)
+    print(f"✅ Augmented training data saved at {AUGMENTED_DATA_OUTPUT_PATH}")
     # Optional: evaluate synthetic quality
     # ctgan_synthesizer.evaluate_synthetic_data(df_for_ctgan_training, synthetic_df)
 
@@ -54,12 +60,12 @@ def main():
 
     if not (os.path.exists(MODEL_PATH) and os.path.exists(DBN_MODEL_PATH) and os.path.exists(THRESHOLD_PATH)):
         print("Model or artifacts not found. Training VAE+DBN and computing threshold...")
-        vae_model, encoders, scaler, dbn_trained, anomaly_threshold = train_vae_dbn(NSL_KDD_TRAIN_PATH)
+        vae_model, encoders, scaler, dbn_trained, anomaly_threshold = train_vae_dbn(AUGMENTED_DATA_OUTPUT_PATH)
     else:
         print("📦 Loading saved model and preprocessing objects...")
 
         # Load encoders/scaler to ensure consistent preprocessing
-        _, _, _, encoders, scaler = load_and_preprocess_nslkdd_data(NSL_KDD_TRAIN_PATH)
+        _, _, _, encoders, scaler = load_and_preprocess_nslkdd_data(AUGMENTED_DATA_OUTPUT_PATH)
 
         # Initialize and load DBN
         dummy_input_dim = 122

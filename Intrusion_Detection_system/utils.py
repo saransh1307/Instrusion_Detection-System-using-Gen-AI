@@ -59,6 +59,10 @@ def load_and_preprocess_nslkdd_data(filepath, encoders=None, scaler=None):
 
     # Encode categorical features
     categorical_cols = ['protocol_type', 'service', 'flag']
+
+    df = df.apply(pd.to_numeric, errors='coerce')  # Convert invalid strings to NaN
+    df.dropna(inplace=True) 
+
     if encoders is None:
         encoders = {}
         for col in categorical_cols:
@@ -77,6 +81,11 @@ def load_and_preprocess_nslkdd_data(filepath, encoders=None, scaler=None):
 
             X[col] = encoders[col].transform(X[col])
 
+    before = X.shape[0]
+    X = X.apply(pd.to_numeric, errors='coerce')
+    X.dropna(inplace=True)
+    print(f"⚠️ Dropped {before - X.shape[0]} malformed rows from {filepath}")
+
     # Scale numerical features
     if scaler is None:
         scaler = MinMaxScaler()
@@ -85,7 +94,7 @@ def load_and_preprocess_nslkdd_data(filepath, encoders=None, scaler=None):
         X_scaled = scaler.transform(X)
 
     # Convert attack_type to binary (0 for normal, 1 for malicious)
-    y_binary = y.apply(lambda x: 0 if x == 'normal' else 1)
+    y_binary = y.iloc[X.index].apply(lambda x: 0 if x == 'normal' else 1)
 
     return X_scaled, y_binary, original_df, encoders, scaler
 

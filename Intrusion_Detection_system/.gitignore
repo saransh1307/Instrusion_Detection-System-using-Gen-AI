@@ -1,4 +1,11 @@
 .DS_Store
 __pycache__/
 *.pyc
-.DS_Store
+.env
+*.log
+*.swp
+*.bak
+.idea/
+.vscode/
+*.egg-info/
+
